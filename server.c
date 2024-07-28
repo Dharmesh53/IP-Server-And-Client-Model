@@ -1,11 +1,15 @@
-#include <complex.h>
+#include <linux/ip.h>   // iphdr
+#include <signal.h>     // signal
 #include <errno.h>      // errno, perror
 #include <arpa/inet.h>  // inet_pton, inet_ntop
 #include <netinet/in.h> // sockaddr_in, htons, ntohs
 #include <stdio.h>      // fprintf, printf, scanf
 #include <stdlib.h>     // malloc, free, exit
-#include <string.h>
-#include <sys/socket.h>
+#include <string.h>     // string, strlen
+#include <sys/socket.h> // socket
+#include <unistd.h>     // read, write, close
+
+#define SERVER_IP "192.168.1.6"
 
 struct sockaddr_in *server_address = NULL; // pointer to the server address structure
 struct sockaddr_in *client_address = NULL; // pointer to the client address structure
@@ -23,24 +27,13 @@ void handle_error(const char *msg)
     exit(EXIT_FAILURE);
 }
 
-void process_packet(char *buffer, ssize_t received_bytes, int socket_fd, struct sockaddr_in *client_addr, socklen_t client_addr_len)
+/* When ever you press Ctrl + C, socket should be closed and memory should be freed */
+void interrupt_handler(int signum)
 {
-    // Null-terminate the received data to treat it as a string
-    buffer[received_bytes] = '\0';
-
-    printf("Received from client: %s\n", buffer);
-
-    // Prepare the response (in this case, just echoing back the received message)
-    char response[1024];
-    snprintf(response, sizeof(response), "Server echoes: %s", buffer);
-
-    // Send the response back to the client
-    ssize_t sent_bytes = sendto(socket_fd, response, strlen(response), 0,
-                                (struct sockaddr *)client_addr, client_addr_len);
-    if (sent_bytes < 0)
-    {
-        handle_error("sendto failed in process_packet");
-    }
+    close(socket_file_desc);
+    free(server_address);
+    free(client_address);
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[])
@@ -63,6 +56,9 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    signal(SIGINT, interrupt_handler);
+    signal(SIGTERM, interrupt_handler);
+
     // malloc is assigning a memory address to our server_address, making it point to a struct sockaddr_in object
     // we also need to typecast the void pointer returned by malloc to sockaddr_in pointer
     server_address = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
@@ -84,7 +80,7 @@ int main(int argc, char *argv[])
     }
 
     /* create the socket */
-    socket_file_desc = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
+    socket_file_desc = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
     if (socket_file_desc < 0)
     {
         handle_error("Socket creation failed");
@@ -103,7 +99,7 @@ int main(int argc, char *argv[])
     // here sin_addr is a ` struct in_addr ` and in that structure we have a uint32_t s_addr in which we are assigning our IP
     // In in_addr, uint32_t is  typedef to in_addr_t
     // inet_addr converts ip from numbers and dot format to binary format in network byte order
-    server_address->sin_addr.s_addr = inet_addr("192.168.1.6");
+    server_address->sin_addr.s_addr = inet_addr(SERVER_IP);
 
     // here we associate our socket to a specific network interface and port number that is called binding
     // in our case, I already have created 2 virtual network interfaces, one for server and other for client
@@ -113,5 +109,38 @@ int main(int argc, char *argv[])
         handle_error("Bind failed");
     }
 
-    return EXIT_SUCCESS; // EXIT_SUCCESS = zero
+    printf("Server is listening on %s:%d\n", SERVER_IP, port_number);
+
+    // BUffer for incomming data
+    char buffer[4096];
+
+    // used by recvfrom() to know size of client_address
+    socklen_t address_length = sizeof(struct sockaddr_in);
+
+    while (1)
+    {
+        // clears the buffer by setting it to 0
+        memset(buffer, 0, sizeof(buffer));
+
+        // receive data from the socket using its file descriptor that is send by someone on this socket and store that data in buffer
+        // And store the sender's address in the client address structure
+        // the address_length is used by recevfrom() to know maximum size of the address information it can write in client_address after the function call its value will be changed to the acutal size of address information it wrote
+        int byte_received = recvfrom(socket_file_desc, buffer, sizeof(buffer), 0, (struct sockaddr *)client_address, &address_length);
+
+        // In case recvfrom() got any error
+        if (byte_received < 0)
+        {
+            handle_error("Error receiving data");
+        }
+
+        // here buffer will receive a packet with IP header + Data concatenated
+        // so we need to get that data seperated, that can be done by just adding that length of IP header(ihl) to the buffer address
+        struct iphdr *ip_header = (struct iphdr *)buffer;
+        char *data              = buffer + (ip_header->ihl * 4);
+
+        printf("Received packet from %s:%d\n", inet_ntoa(client_address->sin_addr), ntohs(client_address->sin_port));
+        printf("Data: %s\n", data);
+    }
+    interrupt_handler(SIGKILL);
+    return EXIT_SUCCESS; // EXIT_SUCCESS = 0
 }
