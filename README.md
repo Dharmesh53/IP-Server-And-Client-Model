@@ -1,3 +1,5 @@
+## Basic Introduction
+
 Most interprocess communication uses the client server model. These terms refer to the two processes which will be communicating with each other. One of the two processes, the client, connects to the other process, the server, typically to make a request for information. A good analogy is a person who makes a phone call to another person.
 
 The system calls for establishing a connection are somewhat different for the client and the server, but both involve the basic construct of a socket.
@@ -14,8 +16,6 @@ The steps involved in establishing a socket on the client side are as follows:
 The steps involved in establishing a socket on the server side are as follows:
 - Create a socket with the socket() system call
 - Bind the socket to an address using the bind() system call. For a server socket on the Internet, an address consists of a port number on the host machine.
-- Listen for connections with the listen() system call
-- Accept a connection with the accept() system call. This call typically blocks until a client connects with the server.
 - Send and receive data
 
 When a socket is created, the program has to specify the address domain and the socket type.
@@ -29,3 +29,26 @@ The lower numbers are reserved in Unix for standard services. For example, the p
 Port numbers above 2000 to 65535 are generally available.
 
 A virtual network interface (VNI) is an abstract virtualized representation of a computer network interface that may or may not correspond directly to a network interface controller.
+
+To run the code first setup two virtual interfaces:
+```
+    sudo ifconfig wlp3s0:1 192.168.1.6 up
+    sudo ifconfig wlp3s0:2 192.168.1.7 up
+```
+change the wlp3s0 with your network interfaces 
+
+Then you need to compile the program
+```
+g++ -o server server.cpp
+g++ -o client client.cpp
+```
+
+Then you can run the server and client like 
+```
+./server 5000 
+// telling server to run on which port number
+
+./client 5000
+// telling client on which port server is running
+```
+

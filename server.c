@@ -138,6 +138,7 @@ int main(int argc, char *argv[])
         struct iphdr *ip_header = (struct iphdr *)buffer;
         char *data              = buffer + (ip_header->ihl * 4);
 
+        // inet_ntoa : changes address from binary to ascii , ntohs : network byte order to host short
         printf("Received packet from %s:%d\n", inet_ntoa(client_address->sin_addr), ntohs(client_address->sin_port));
         printf("Data: %s\n", data);
     }
