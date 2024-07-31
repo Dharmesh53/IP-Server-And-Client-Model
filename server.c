@@ -10,6 +10,7 @@
 #include <unistd.h>     // read, write, close
 
 #define SERVER_IP "192.168.1.6"
+#define CLIENT_IP "192.168.1.7"
 
 struct sockaddr_in *server_address = NULL; // pointer to the server address structure
 struct sockaddr_in *client_address = NULL; // pointer to the client address structure
@@ -33,7 +34,34 @@ void interrupt_handler(int signum)
     close(socket_file_desc);
     free(server_address);
     free(client_address);
+    printf("\nSocket closed");
     exit(EXIT_SUCCESS);
+}
+
+// Generic checksum function
+unsigned short checksum(void *buffer, int len)
+{
+    unsigned short *data_buffer = buffer;
+    unsigned int sum            = 0;
+    unsigned short result;
+
+    while (len > 1)
+    {
+        sum += *data_buffer++;
+        len -= 2;
+    }
+
+    if (len == 1)
+    {
+        sum += *(unsigned char *)data_buffer;
+    }
+
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+
+    result = ~sum;
+
+    return result;
 }
 
 int main(int argc, char *argv[])
@@ -111,7 +139,7 @@ int main(int argc, char *argv[])
 
     printf("Server is listening on %s:%d\n", SERVER_IP, port_number);
 
-    // BUffer for incomming data
+    // Buffer for incomming data
     char buffer[4096];
 
     // used by recvfrom() to know size of client_address
@@ -135,13 +163,98 @@ int main(int argc, char *argv[])
 
         // here buffer will receive a packet with IP header + Data concatenated
         // so we need to get that data seperated, that can be done by just adding that length of IP header(ihl) to the buffer address
-        struct iphdr *ip_header = (struct iphdr *)buffer;
-        char *data              = buffer + (ip_header->ihl * 4);
+        struct iphdr *received_ip_header = (struct iphdr *)buffer;
+
+        // ihl value was stored in words so converting it into bytes by multiplying by 4
+        char *data = buffer + (received_ip_header->ihl * 4);
 
         // inet_ntoa : changes address from binary to ascii , ntohs : network byte order to host short
         printf("Received packet from %s:%d\n", inet_ntoa(client_address->sin_addr), ntohs(client_address->sin_port));
         printf("Data: %s\n", data);
+
+        // just a string that client is going to receive in the reply packet
+        char *reply = "Shut the fuck upp!!";
+
+        // as the buffer already have the received packet's data, we need to clear the buffer and copy our reply string to it
+        memset(buffer, 0, sizeof(buffer));
+        strncpy(buffer, reply, sizeof(buffer));
+
+        // added null character at the end to terminate the string
+        buffer[sizeof(buffer) - 1] = '\0';
+
+        /* we need to create a reply packet for client */
+
+        // it is a pointer of type iphdr to a memory address which is going to store our ip header
+        struct iphdr *sending_ip_header = (struct iphdr *)malloc(sizeof(struct iphdr));
+
+        // in case memory allocation failed
+        if (sending_ip_header == NULL)
+        {
+            handle_error("Failed during memory allocation");
+        }
+
+        // Allocate memory for a packet consisting of an IP header (iphdr) and buffer.
+        char *packet = (char *)malloc(sizeof(struct iphdr) + sizeof(buffer));
+
+        // in case memory allocation failed
+        if (packet == NULL)
+        {
+            handle_error("Failed during memory allocation");
+        }
+
+        // In case there is alreadyy something in the packet memory , we need to ensure that its all 0
+        memset(packet, 0, sizeof(struct iphdr) + sizeof(buffer));
+
+        /* setting up IP header here */
+        // ihl: ip header length and 5 = 5 words = 5 * 4 bytes = 20 bytes
+        sending_ip_header->ihl = 5;
+
+        // ip address version either it is a ipv4 or ipv6
+        sending_ip_header->version = 4;
+
+        // it indicates that the packet is containing raw IP data
+        sending_ip_header->protocol = IPPROTO_RAW;
+
+        // total length of the packet
+        sending_ip_header->tot_len = htons(sizeof(struct iphdr) + strlen(buffer));
+
+        sending_ip_header->ttl = 255;
+
+        // source address to equal to client_ip that we defined as micro on top
+        // inet_addr conver the ip from dots and number to binary format
+        sending_ip_header->saddr = inet_addr(SERVER_IP);
+
+        // destination address to equal to serrver_ip that we defined as micro on top
+        sending_ip_header->daddr = inet_addr(CLIENT_IP);
+
+        // here is the final check that will store a unsigned short which is calculated by some certain mathematical operation by combining all the data of sending_ip_header;
+        // At server what ever the header it will receive, will also calculate the checksum number
+        // if we got the same number after calculation at server as the sending_ip_header->check it will mean that all the information is correctly transmitted
+        // this number is just used to double verify things
+        sending_ip_header->check = checksum((unsigned short *)sending_ip_header, sending_ip_header->tot_len);
+
+        // copying the IP header to packet
+        memcpy(packet, sending_ip_header, sizeof(struct iphdr));
+
+        // after the IP header we need to copy out reply message to packet
+        memcpy(packet + sizeof(struct iphdr), buffer, strlen(buffer));
+
+        // sending the packet
+        int byte_send = sendto(socket_file_desc, packet, ntohs(sending_ip_header->tot_len), 0, (struct sockaddr *)client_address, address_length);
+
+        // in case packet failed to send;
+        if (byte_send < 0)
+        {
+            handle_error("Error sending reply");
+        }
+
+        printf("Reply sent to client\n");
+        printf("---------------------------------------\n");
+
+        free(sending_ip_header);
+        free(packet);
     }
+
     interrupt_handler(SIGKILL);
     return EXIT_SUCCESS; // EXIT_SUCCESS = 0
 }

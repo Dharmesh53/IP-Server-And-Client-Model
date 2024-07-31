@@ -32,9 +32,11 @@ void interrupt_handler(int signum)
 {
     close(socket_file_desc);
     free(server_address);
+    printf("Socket closed");
     exit(EXIT_SUCCESS);
 }
 
+// Generic checksum function
 unsigned short checksum(void *buffer, int len)
 {
     unsigned short *data_buffer = buffer;
@@ -127,7 +129,7 @@ int main(int argc, char *argv[])
         handle_error("Failed during memory allocation");
     }
 
-    // a pointer to the memory in which complete packet that we are goinh to send throught socket is stored
+    // a pointer to the memory in which complete packet that we are going to send throught socket is stored
     char *packet = (char *)malloc(sizeof(struct iphdr) + sizeof(message));
 
     // in case memory can't be allocated
@@ -198,6 +200,39 @@ int main(int argc, char *argv[])
         }
 
         printf("Raw packet send to server\n");
+
+        // After sending our message, we need to wait for the server reply for that we need to loop through recvfrom() until we get something
+        // If we don't run this loop, recvfrom() we again read the meesage that you have send and copy it in buffer (that is some messed up shit, you can try it by yourself in case you don't understand what i'm saying)
+        while (1)
+        {
+            // clearing the message to receive the server reply data
+            memset(message, 0, sizeof(message));
+
+            // receiving the packet
+            int byte_received = recvfrom(socket_file_desc, message, sizeof(message), 0, NULL, NULL);
+
+            // in case failed to receive packet
+            if (byte_received < 0)
+            {
+                handle_error("Error receiving reply");
+            }
+
+            // Cast the message pointer to a struct iphdr* to access the IP header fields.
+            // This allows us to interpret the data in 'message' as an IP header.
+            struct iphdr *recv_ip_header = (struct iphdr *)message;
+
+            // Calculate the address of the data following the IP header in the message.
+            // The length of the IP header is given in 32-bit words (ihl), so we multiply by 4 to get the byte offset.
+            char *data = message + (recv_ip_header->ihl * 4);
+
+            // Check if this packet is from the server (not our own packet)
+            if (recv_ip_header->saddr == inet_addr(SERVER_IP))
+            {
+                printf("Received reply from server: %s\n", data);
+                printf("----------------------------------------\n");
+                break; // Exit the inner while loop to send next message
+            }
+        }
     }
 
     interrupt_handler(SIGKILL);
