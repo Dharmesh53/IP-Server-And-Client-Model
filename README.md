@@ -30,10 +30,14 @@ Port numbers above 2000 to 65535 are generally available.
 
 A virtual network interface (VNI) is an abstract virtualized representation of a computer network interface that may or may not correspond directly to a network interface controller.
 
+#### These codes can only run in linux environment
+
 To run the code first setup two virtual interfaces:
+
+These virtual network interfaces only exists till your next reboot
 ```
-    sudo ifconfig wlp3s0:1 192.168.1.6 up
-    sudo ifconfig wlp3s0:2 192.168.1.7 up
+sudo ifconfig wlp3s0:1 192.168.1.6 up
+sudo ifconfig wlp3s0:2 192.168.1.7 up
 ```
 change the wlp3s0 with your network interfaces 
 

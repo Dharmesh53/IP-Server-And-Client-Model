@@ -13,4 +13,5 @@ SortIncludes: false
 AlignOperands: true
 BreakBeforeBinaryOperators: All
 AlignConsecutiveMacros: true
+
 AlignConsecutiveAssignments: true
