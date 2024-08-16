@@ -1,6 +1,5 @@
 #include <linux/ip.h>   // iphdr
 #include <signal.h>     // signal
-#include <errno.h>      // errno, perror
 #include <arpa/inet.h>  // inet_pton, inet_ntop
 #include <netinet/in.h> // sockaddr_in, htons, ntohs
 #include <stdio.h>      // fprintf, printf, scanf
@@ -169,11 +168,11 @@ int main(int argc, char *argv[])
         char *data = buffer + (received_ip_header->ihl * 4);
 
         // inet_ntoa : changes address from binary to ascii , ntohs : network byte order to host short
-        printf("Received packet from %s:%d\n", inet_ntoa(client_address->sin_addr), ntohs(client_address->sin_port));
+        printf("Received packet from %s\n", inet_ntoa(client_address->sin_addr));
         printf("Data: %s\n", data);
 
         // just a string that client is going to receive in the reply packet
-        char *reply = "Shut the fuck upp!!";
+        char *reply = "What do you want ??";
 
         // as the buffer already have the received packet's data, we need to clear the buffer and copy our reply string to it
         memset(buffer, 0, sizeof(buffer));
