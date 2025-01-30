@@ -40,7 +40,7 @@ void interrupt_handler(int signum)
 // Generic checksum function
 unsigned short checksum(void *buffer, int len)
 {
-    unsigned short *data_buffer = buffer;
+    unsigned short *data_buffer = (unsigned short *)buffer;
     unsigned int sum            = 0;
     unsigned short result;
 
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
         printf("Data: %s\n", data);
 
         // just a string that client is going to receive in the reply packet
-        char *reply = "What do you want ??";
+        const char *reply = "What do you want ??";
 
         // as the buffer already have the received packet's data, we need to clear the buffer and copy our reply string to it
         memset(buffer, 0, sizeof(buffer));

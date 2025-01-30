@@ -44,13 +44,13 @@ sudo ifconfig wlan0:2 192.168.1.7 up
 
 Then you need to compile the program
 ```
-g++ -o server server.cpp
-g++ -o client client.cpp
+g++ -o server server.c
+g++ -o client client.c
 ```
-
-./server 5000 
-// telling server to run on which port number
-
-./client
 ```
+sudo ./server 5000 
+
+sudo ./client
+```
+You need to run the executable on sudo because creating raw socket require admin permission.
 

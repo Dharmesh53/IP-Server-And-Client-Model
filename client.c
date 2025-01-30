@@ -35,7 +35,7 @@ void interrupt_handler(int signum)
 // Generic checksum function
 unsigned short checksum(void *buffer, int len)
 {
-    unsigned short *data_buffer = buffer;
+    unsigned short *data_buffer = (unsigned short *)buffer;
     unsigned int sum            = 0;
     unsigned short result;
 
